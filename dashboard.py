@@ -212,11 +212,10 @@ if st.button("Generate Complete Statutory Legal & RTI Dossier", type="primary"):
                 Maintain an objective, rigorous, and legally binding tone. Do not include informal commentary.
                 """
 
-                # Multi-model fallback chain to protect against temporary 503 traffic spikes
+                # Active, verified model IDs with fallback
                 models_to_try = [
                     'gemini-2.5-flash',
-                    'gemini-2.5-pro',
-                    'gemini-2.0-flash'
+                    'gemini-2.5-pro'
                 ]
                 
                 response = None
@@ -235,7 +234,7 @@ if st.button("Generate Complete Statutory Legal & RTI Dossier", type="primary"):
                         continue
                 
                 if not response or not response.text:
-                    raise Exception(f"Endpoints busy or unavailable: {last_error}")
+                    raise Exception(f"Model service unavailable: {last_error}")
 
                 dossier_content = response.text
                 st.success("✅ Statutory Field Audit Dossier Generated!")
