@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from google import genai
 from fpdf import FPDF
+import re
 import io
 
 # Page Configuration
@@ -10,6 +11,17 @@ st.set_page_config(
     page_icon="⚖️",
     layout="wide"
 )
+
+# Custom UI Styling for responsive layout & buttons
+st.markdown("""
+<style>
+    div.stButton > button {
+        width: 100%;
+        border-radius: 8px;
+        font-weight: 600;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # Administrative Hierarchy Mapping across States
 JURISDICTION_REGISTRY = {
@@ -84,20 +96,19 @@ def build_pdf_dossier(school_name, udise_code, state, district, block, generated
     pdf.cell(0, 5, f"ADMINISTRATIVE JURISDICTION: Block {block}, District {district}, {state}", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(3)
     
-    # Comprehensive character sanitization for PDF encoding
+    # Robust character & Markdown sanitization to eliminate visual artifacts
+    clean_text = generated_text
+    clean_text = re.sub(r'[*#_]', '', clean_text)  # Remove Markdown bold/header symbols
+    clean_text = re.sub(r'\\+', '', clean_text)    # Remove backslashes
     clean_text = (
-        generated_text.replace("**", "")
-        .replace("###", "")
-        .replace("##", "")
-        .replace("#", "")
-        .replace("–", "-")
+        clean_text.replace("–", "-")
         .replace("—", "-")
         .replace("’", "'")
         .replace("‘", "'")
         .replace("“", '"')
         .replace("”", '"')
         .replace("₹", "Rs. ")
-        .replace("•", "-")
+        .replace("•", "- ")
         .replace("…", "...")
     )
     clean_text = clean_text.encode("latin-1", "replace").decode("latin-1")
@@ -105,11 +116,11 @@ def build_pdf_dossier(school_name, udise_code, state, district, block, generated
     pdf.set_font("Helvetica", size=9)
     pdf.multi_cell(0, 5.2, clean_text)
     
-    # Field Verification Block - prevents page split
-    if pdf.get_y() > 220:
+    # Field Verification Block - prevents awkward page breaks
+    if pdf.get_y() > 210:
         pdf.add_page()
     else:
-        pdf.ln(4)
+        pdf.ln(5)
         
     pdf.set_font("Helvetica", "B", 9)
     pdf.cell(0, 5, "ON-GROUND VERIFICATION & PHYSICAL CITIZEN ENDORSEMENT", new_x="LMARGIN", new_y="NEXT")
@@ -120,6 +131,14 @@ def build_pdf_dossier(school_name, udise_code, state, district, block, generated
     pdf.cell(0, 5, "2. Name: __________________________  Phone: ___________________  Signature: _______________", new_x="LMARGIN", new_y="NEXT")
     pdf.cell(0, 5, "3. SMC / Ward Rep: _________________  Designation: ______________  Signature: _______________", new_x="LMARGIN", new_y="NEXT")
     
+    # Postal Tracking Slip Section
+    pdf.ln(4)
+    pdf.set_font("Helvetica", "B", 8.5)
+    pdf.cell(0, 4.5, "STATUTORY DISPATCH RECORD (SPEED POST / REGISTERED POST):", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("Helvetica", size=8)
+    pdf.cell(0, 4.5, "Consignment Number: ________________________  Booking Date: ________________________", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 4.5, "Booking Post Office: ________________________  Mandatory 30-Day Response Target: ________________________", new_x="LMARGIN", new_y="NEXT")
+
     return bytes(pdf.output())
 
 # Main Streamlit Application UI
@@ -133,8 +152,8 @@ st.divider()
 
 col_i1, col_i2, col_i3 = st.columns(3)
 with col_i1:
-    school_name = st.text_input("School / Institution Name*", placeholder="e.g. Salboni Rural Primary School")
-    udise_code = st.text_input("11-Digit UDISE+ Code*", placeholder="e.g. 19200804502")
+    school_name = st.text_input("School / Institution Name*", placeholder="e.g. Amjore Primary School")
+    udise_code = st.text_input("11-Digit UDISE+ Code*", placeholder="e.g. 19200607401")
 with col_i2:
     state = st.selectbox("State / Territory*", list(JURISDICTION_REGISTRY.keys()))
     district = st.text_input("District*", placeholder="e.g. Paschim Medinipur")
@@ -154,7 +173,10 @@ with ch3:
     f_cwsn = st.checkbox("Absence of CWSN disabled barrier-free ramp access")
     f_mdm = st.checkbox("Unsafe or non-existent Mid-Day Meal kitchen shed")
 
-custom_notes = st.text_area("Specific Ground Observations (Optional)", placeholder="e.g. Handpump dry for 14 months; students forced to fetch water from 500m away.")
+custom_notes = st.text_area(
+    "Specific Ground Observations (Optional)", 
+    placeholder="e.g. Single tube-well contaminated with high iron content for 8 months. Girl students forced to walk to nearby village pond."
+)
 
 st.divider()
 
@@ -213,7 +235,7 @@ if st.button("Generate Complete Statutory Legal & RTI Dossier", type="primary"):
                    - Certified copies of physical inspection notes and deficit compliance reports submitted by the Block Education Officer / Sub-Inspector of Schools for this school over the last 24 months.
                    - Certified records of contractors or agencies assigned civil maintenance work for toilets, drinking water, and boundary walls at this institution along with Utilization Certificates (UCs).
                 
-                Maintain an objective, rigorous, and legally binding tone. Do not include informal commentary.
+                Maintain an objective, rigorous, and legally binding tone. Do not use Markdown asterisks or bold headers in the generated output text.
                 """
 
                 response = client.models.generate_content(
