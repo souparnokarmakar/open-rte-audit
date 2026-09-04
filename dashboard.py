@@ -2,166 +2,205 @@ import streamlit as st
 import pandas as pd
 from google import genai
 from fpdf import FPDF
+import io
 
 # Page Configuration
 st.set_page_config(
-    page_title="OpenRTE - National Infrastructure & RTI Intelligence Engine",
-    page_icon="🏛️",
+    page_title="OpenRTE - National Evidentiary Civic Audit Platform",
+    page_icon="⚖️",
     layout="wide"
 )
 
-# State-to-Authority Administrative Mapping
-STATE_AUTHORITY_MAP = {
-    "West Bengal": {"officer": "District Inspector of Schools (DI/SE)", "dept": "School Education Department, Govt. of West Bengal"},
-    "Uttar Pradesh": {"officer": "Basic Shiksha Adhikari (BSA)", "dept": "Department of Basic Education, Govt. of Uttar Pradesh"},
-    "Bihar": {"officer": "District Education Officer (DEO)", "dept": "Education Department, Govt. of Bihar"},
-    "Tamil Nadu": {"officer": "Chief Educational Officer (CEO)", "dept": "School Education Department, Govt. of Tamil Nadu"},
-    "Maharashtra": {"officer": "Education Officer (Primary/Secondary), Zilla Parishad", "dept": "School Education and Sports Department, Govt. of Maharashtra"},
-    "Karnataka": {"officer": "Deputy Director of Public Instruction (DDPI)", "dept": "Department of School Education and Literacy, Govt. of Karnataka"},
-    "Jharkhand": {"officer": "District Education Officer (DEO) / DSE", "dept": "Department of School Education & Literacy, Govt. of Jharkhand"},
-    "Odisha": {"officer": "District Education Officer (DEO)", "dept": "School & Mass Education Department, Govt. of Odisha"},
-    "Rajasthan": {"officer": "Chief District Education Officer (CDEO)", "dept": "Department of School Education, Govt. of Rajasthan"},
-    "Madhya Pradesh": {"officer": "District Education Officer (DEO)", "dept": "School Education Department, Govt. of Madhya Pradesh"},
-    "Assam": {"officer": "District Elementary Education Officer (DEEO)", "dept": "Department of School Education, Govt. of Assam"},
-    "Delhi (NCT)": {"officer": "Deputy Director of Education (DDE), District Zone", "dept": "Directorate of Education, Govt. of NCT of Delhi"}
+# Administrative Hierarchy Mapping across States
+JURISDICTION_REGISTRY = {
+    "West Bengal": {
+        "primary_officer": "District Inspector of Schools (PE / SE)",
+        "district_lead": "District Magistrate & Collector",
+        "state_dept": "Department of School Education, Govt. of West Bengal",
+        "rules_ref": "West Bengal Right of Children to Free and Compulsory Education Rules, 2012"
+    },
+    "Bihar": {
+        "primary_officer": "District Education Officer (DEO) / DPO (SSA)",
+        "district_lead": "District Magistrate",
+        "state_dept": "Education Department, Govt. of Bihar",
+        "rules_ref": "Bihar State RTE Rules, 2011"
+    },
+    "Uttar Pradesh": {
+        "primary_officer": "Basic Shiksha Adhikari (BSA)",
+        "district_lead": "District Magistrate",
+        "state_dept": "Department of Basic Education, Govt. of Uttar Pradesh",
+        "rules_ref": "Uttar Pradesh Right of Children to Free and Compulsory Education Rules, 2011"
+    },
+    "Maharashtra": {
+        "primary_officer": "Education Officer (Primary), Zilla Parishad",
+        "district_lead": "District Collector & CEO ZP",
+        "state_dept": "School Education Department, Govt. of Maharashtra",
+        "rules_ref": "Maharashtra RTE Rules, 2011"
+    },
+    "Jharkhand": {
+        "primary_officer": "District Superintendent of Education (DSE)",
+        "district_lead": "Deputy Commissioner",
+        "state_dept": "Department of School Education and Literacy, Govt. of Jharkhand",
+        "rules_ref": "Jharkhand RTE Rules, 2011"
+    },
+    "Odisha": {
+        "primary_officer": "District Education Officer (DEO)",
+        "district_lead": "Collector & District Magistrate",
+        "state_dept": "School and Mass Education Department, Govt. of Odisha",
+        "rules_ref": "Odisha RTE Rules, 2010"
+    },
+    "Tamil Nadu": {
+        "primary_officer": "Chief Educational Officer (CEO)",
+        "district_lead": "District Collector",
+        "state_dept": "Department of School Education, Govt. of Tamil Nadu",
+        "rules_ref": "Tamil Nadu RTE Rules, 2011"
+    }
 }
 
-# PDF Generator Class
-class NationalLegalDossierPDF(FPDF):
+# Advanced PDF Formatter
+class AuditDossierPDF(FPDF):
     def header(self):
         self.set_font("Helvetica", "B", 12)
-        self.cell(0, 7, "STATUTORY CITIZEN DOSSIER & RTI DEMAND UNDER RTE ACT, 2009", border=0, align="C", new_x="LMARGIN", new_y="NEXT")
+        self.cell(0, 7, "STATUTORY FIELD AUDIT & CITIZEN COMPLIANCE DOSSIER", border=0, align="C", new_x="LMARGIN", new_y="NEXT")
         self.set_font("Helvetica", "I", 8.5)
-        self.cell(0, 5, "Generated via OpenRTE National Civic Intelligence Engine | Form 6(1) RTI & Section 19 Compliance", border=0, align="C", new_x="LMARGIN", new_y="NEXT")
+        self.cell(0, 5, "Statutory Action Pack under RTE Act (Sec 19) & Right to Information Act, 2005 (Sec 6)", border=0, align="C", new_x="LMARGIN", new_y="NEXT")
         self.line(10, 23, 200, 23)
         self.ln(5)
 
     def footer(self):
         self.set_y(-15)
         self.set_font("Helvetica", "I", 8)
-        self.cell(0, 10, f"OpenRTE National Infrastructure Protocol | Page {self.page_no()}", align="C")
+        self.cell(0, 10, f"OpenRTE Public Audit & Evidentiary Engine | Document Page {self.page_no()}", align="C")
 
-def generate_pdf(school_name, udise_code, state, district, block, content):
-    pdf = NationalLegalDossierPDF()
+def build_pdf_dossier(school_name, udise_code, state, district, block, generated_text):
+    pdf = AuditDossierPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
     
-    # Metadata Box
+    # Header Information Box
     pdf.set_font("Helvetica", "B", 9.5)
-    pdf.cell(0, 5, f"INSTITUTION: {school_name} | UDISE: {udise_code}", new_x="LMARGIN", new_y="NEXT")
-    pdf.set_font("Helvetica", size=9)
-    pdf.cell(0, 5, f"JURISDICTION: Block {block}, District {district}, {state}", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 5, f"AUDIT TARGET: {school_name.upper()} | UDISE CODE: {udise_code}", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("Helvetica", size=8.5)
+    pdf.cell(0, 5, f"ADMINISTRATIVE JURISDICTION: Block {block}, District {district}, {state}", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(3)
     
-    # Clean and render body text
+    # Body Processing
     pdf.set_font("Helvetica", size=9)
-    clean_text = content.replace("**", "").replace("#", "").replace("–", "-").replace("—", "-")
+    clean_text = (
+        generated_text.replace("**", "")
+        .replace("###", "")
+        .replace("##", "")
+        .replace("#", "")
+        .replace("–", "-")
+        .replace("—", "-")
+    )
     pdf.multi_cell(0, 5.2, clean_text)
     
-    # Formal Signature Blocks
+    # Field Verification Block
     pdf.ln(6)
     pdf.set_font("Helvetica", "B", 9)
-    pdf.cell(0, 5, "Submitted on behalf of School Management Committee (SMC) & Concerned Citizens:", new_x="LMARGIN", new_y="NEXT")
-    pdf.set_font("Helvetica", size=8.5)
-    pdf.cell(0, 5, "1. Name: _______________________  Signature: __________________  Date: ____________", new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(0, 5, "2. Name: _______________________  Signature: __________________  Date: ____________", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 5, "ON-GROUND VERIFICATION & PHYSICAL CITIZEN ENDORSEMENT", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("Helvetica", size=8)
+    pdf.cell(0, 4.5, "We hereby certify that a physical spot audit of the institution was conducted and the deficits cited above were verified:", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(2)
+    pdf.cell(0, 5, "1. Name: __________________________  Phone: ___________________  Signature: _______________", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 5, "2. Name: __________________________  Phone: ___________________  Signature: _______________", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 5, "3. SMC / Ward Rep: _________________  Designation: ______________  Signature: _______________", new_x="LMARGIN", new_y="NEXT")
     
     return bytes(pdf.output())
 
-# Main Interface
-st.title("🏛️ OpenRTE: Pan-India Infrastructure & Statutory Action Engine")
+# Main Streamlit Application UI
+st.title("⚖️ OpenRTE: Citizen Evidentiary Audit & Legal Redressal Engine")
 st.markdown(
-    "Automating the generation of **Legally-Binding Grievance Memorandums** and **Section 6(1) RTI Applications** "
-    "for any public school across India under **Section 19 of the RTE Act, 2009**."
+    "Standardizing on-ground school infrastructure audits into **Statutory Section 19 Demands** "
+    "and **Form 6(1) RTI Applications** for grassroots transparency campaigns."
 )
 
 st.divider()
 
-# Input Grid
-col1, col2, col3 = st.columns(3)
-with col1:
-    school_name = st.text_input("School Name*", placeholder="e.g. Salboni Rural Primary School")
-    udise_code = st.text_input("11-Digit National UDISE Code*", placeholder="e.g. 19200804502")
-
-with col2:
-    state = st.selectbox("State / UT*", list(STATE_AUTHORITY_MAP.keys()))
+col_i1, col_i2, col_i3 = st.columns(3)
+with col_i1:
+    school_name = st.text_input("School / Institution Name*", placeholder="e.g. Salboni Rural Primary School")
+    udise_code = st.text_input("11-Digit UDISE+ Code*", placeholder="e.g. 19200804502")
+with col_i2:
+    state = st.selectbox("State / Territory*", list(JURISDICTION_REGISTRY.keys()))
     district = st.text_input("District*", placeholder="e.g. Paschim Medinipur")
+with col_i3:
+    block = st.text_input("Block / Mandal / Tehsil*", placeholder="e.g. Salboni")
+    audit_date = st.date_input("Audit Inspection Date")
 
-with col3:
-    block = st.text_input("Block / Tehsil / Mandal*", placeholder="e.g. Salboni")
-    language = st.selectbox("Target Drafting Language", [
-        "English (Formal Judicial)",
-        "Bengali (বাংলা)",
-        "Hindi (हिन्दी)",
-        "Tamil (தமிழ்)",
-        "Telugu (తెలుగు)",
-        "Marathi (मराठी)",
-        "Kannada (ಕನ್ನಡ)",
-        "Odia (ଓଡ଼ିଆ)"
-    ])
+st.markdown("#### Statutory Deficit Audit Checklist (RTE Act, 2009 - Section 19 Schedule Norms)")
+ch1, ch2, ch3 = st.columns(3)
+with ch1:
+    f_toilets = st.checkbox("Zero functional girls' / boys' toilets")
+    f_water = st.checkbox("Non-functional or contaminated drinking water source")
+with ch2:
+    f_power = st.checkbox("Zero classroom electrification / non-functional ceiling fans")
+    f_boundary = st.checkbox("Collapsed, dilapidated, or missing boundary wall")
+with ch3:
+    f_cwsn = st.checkbox("Absence of CWSN disabled barrier-free ramp access")
+    f_mdm = st.checkbox("Unsafe or non-existent Mid-Day Meal kitchen shed")
 
-st.markdown("#### Audit Statutory Deficits (Schedule to Section 19, RTE Act 2009):")
-d_col1, d_col2 = st.columns(2)
-with d_col1:
-    d1 = st.checkbox("Zero functional gender-segregated toilets for girls/boys")
-    d2 = st.checkbox("Absence of functional potable drinking water facility")
-    d3 = st.checkbox("Absence of classroom electrification & functional ceiling fans")
-with d_col2:
-    d4 = st.checkbox("Compromised perimeter / Missing or collapsed boundary wall")
-    d5 = st.checkbox("Absence of barrier-free disabled access ramps (CWSN)")
-    d6 = st.checkbox("Dilapidated or missing Mid-Day Meal (PM POSHAN) kitchen shed")
+custom_notes = st.text_area("Specific Ground Observations (Optional)", placeholder="e.g. Handpump dry for 14 months; students forced to fetch water from 500m away.")
 
 st.divider()
 
-if st.button("🚀 Generate Dual-Action Dossier (Grievance + RTI Form)", type="primary"):
-    flagged = []
-    if d1: flagged.append("Zero functional gender-segregated toilets (Violation of RTE Sec 19 Norms)")
-    if d2: flagged.append("Absence of safe potable drinking water on premises")
-    if d3: flagged.append("Lack of classroom electrification and fans")
-    if d4: flagged.append("Non-existent/damaged boundary wall compromising child safety")
-    if d5: flagged.append("Absence of CWSN disabled-friendly barrier-free access")
-    if d6: flagged.append("Missing/non-functional PM POSHAN kitchen infrastructure")
+if st.button("Generate Complete Statutory Legal & RTI Dossier", type="primary"):
+    selected_deficits = []
+    if f_toilets: selected_deficits.append("Non-provision of separate functional toilets for girls and boys (Violation of RTE Sec 19 & Schedule Item 2)")
+    if f_water: selected_deficits.append("Absence of potable, functional drinking water supply on premises (Violation of RTE Schedule Item 3)")
+    if f_power: selected_deficits.append("Absence of functional electrical wiring and classroom fans")
+    if f_boundary: selected_deficits.append("Lack of secure boundary wall / perimeter fencing creating hazardous conditions")
+    if f_cwsn: selected_deficits.append("Absence of barrier-free ramp for Children With Special Needs (CWSN)")
+    if f_mdm: selected_deficits.append("Absence of hygienic kitchen shed for PM POSHAN / Mid-Day Meal scheme")
 
     if not school_name or not udise_code or not district or not block:
-        st.error("Please complete all required fields (marked with *).")
-    elif not flagged:
-        st.warning("Please flag at least one infrastructure deficit.")
+        st.error("Please fill in the required institutional identifiers (marked with *).")
+    elif not selected_deficits:
+        st.warning("Please flag at least one infrastructure deficit to audit.")
     else:
-        authority_info = STATE_AUTHORITY_MAP.get(state, {"officer": "District Education Officer", "dept": "School Education Department"})
-        
-        with st.spinner("Compiling dual legal instruments and statutory citations..."):
+        jurisdiction = JURISDICTION_REGISTRY[state]
+        with st.spinner("Compiling statutory citations, precedent rulings, and RTI inquiry clauses..."):
             try:
                 client = genai.Client()
                 prompt = f"""
-                You are an elite Indian administrative and constitutional legal expert. 
-                Generate a comprehensive two-part statutory document:
-                
-                TARGET INSTITUTION DETAILS:
-                - School Name: {school_name}
+                You are a senior constitutional litigator and administrative law specialist in India. 
+                Generate a formal, publication-grade, two-part statutory document based on the following verified field audit:
+
+                AUDIT PARAMETERS:
+                - Target Institution: {school_name}
                 - UDISE Code: {udise_code}
-                - Jurisdiction: Block {block}, District {district}, State of {state}
-                - Designated Statutory Recipient: {authority_info['officer']}, {authority_info['dept']}, and the District Magistrate/Collector.
-                - Flagged Deficits: {', '.join(flagged)}
-                - Language Requirement: {language}
+                - Location: Block {block}, District {district}, State of {state}
+                - Field Inspection Date: {audit_date}
+                - Primary Nodal Authority: {jurisdiction['primary_officer']}
+                - Appellate / District Authority: {jurisdiction['district_lead']}
+                - State Department: {jurisdiction['state_dept']}
+                - Applicable State Rules: {jurisdiction['rules_ref']}
+                - Verified Deficits: {', '.join(selected_deficits)}
+                - Additional Observations: {custom_notes if custom_notes else 'None noted during preliminary scan.'}
+
+                FORMAT THE OUTPUT CLEANLY INTO TWO STANDALONE STATUTORY INSTRUMENTS:
+
+                PART I: FORMAL STATUTORY CITIZEN GRIEVANCE UNDER RTE ACT, 2009
+                1. Addressed to: The {jurisdiction['district_lead']} and The {jurisdiction['primary_officer']}.
+                2. Subject: Formal Notice of Statutory Default regarding non-compliance with Section 19 read with the Schedule of the RTE Act, 2009 at {school_name} (UDISE: {udise_code}).
+                3. Legal Grounding:
+                   - Cite statutory non-compliance under Section 19(2) and Schedule specifications of the RTE Act, 2009.
+                   - Cite Supreme Court precedent in Environmental & Consumer Protection Foundation v. Union of India & Ors. (2012) 10 SCC 197 (establishing that non-provision of basic sanitation and drinking water violates fundamental rights under Article 21A).
+                   - State how this non-compliance triggers provisions under {jurisdiction['rules_ref']}.
+                4. Formal Prayer for Relief:
+                   - Immediate joint site verification within 7 working days.
+                   - Administrative sanction of emergency repair and civil funds under Samagra Shiksha Composite School Grants.
+                   - Written time-bound compliance order not exceeding 30 days.
+
+                PART II: FORM 6(1) APPLICATION UNDER RIGHT TO INFORMATION ACT, 2005
+                1. Addressed to: Public Information Officer (PIO), Office of the {jurisdiction['primary_officer']}, {district}.
+                2. Specific Information Demanded under Section 6(1):
+                   - Certified copies of annual civil maintenance, repair, and composite grants sanctioned to {school_name} (UDISE: {udise_code}) under Samagra Shiksha over the past 3 financial years.
+                   - Certified copies of physical inspection notes and deficit compliance reports submitted by the Block Education Officer / Sub-Inspector of Schools for this school over the last 24 months.
+                   - Certified records of contractors or agencies assigned civil maintenance work for toilets, drinking water, and boundary walls at this institution along with Utilization Certificates (UCs).
                 
-                STRUCTURE THE OUTPUT INTO TWO DISTINCT LEGAL SECTIONS:
-                
-                SECTION I: STATUTORY CITIZEN GRIEVANCE MEMORANDUM
-                1. Addressed to: The District Magistrate and the {authority_info['officer']}.
-                2. Subject: Formal Representation regarding non-compliance with Section 19 read with the Schedule of the RTE Act, 2009 at {school_name}.
-                3. Grounds:
-                   - Cite Section 19 and Schedule norms of the RTE Act, 2009.
-                   - Cite Supreme Court precedent: Environmental & Consumer Protection Foundation v. Union of India (2012) 10 SCC 197 (holding that basic school infrastructure is an inalienable component of the Article 21A right to education).
-                4. Prayer for Relief: Demand immediate physical site inspection within 7 days, sanction of emergency composite school/civil repair grants under Samagra Shiksha, and time-bound 30-day compliance.
-                
-                SECTION II: FORM 6(1) RIGHT TO INFORMATION (RTI) APPLICATION
-                1. Addressed to: Public Information Officer (PIO), Office of the {authority_info['officer']}.
-                2. Specific Information Demanded under Section 6(1) of the RTI Act, 2005:
-                   - Certified copies of annual civil maintenance and composite grants sanctioned to {school_name} (UDISE: {udise_code}) under Samagra Shiksha for the past 3 financial years.
-                   - Inspection notes and compliance reports submitted by the Block Education Officer (BEO) regarding these deficits during the last 24 months.
-                   - Certified expenditure and utilization certificates (UC) submitted for toilet and drinking water repairs for this school.
-                
-                Ensure the tone is strictly legal, authoritative, and structured for immediate official submission.
+                Maintain an objective, rigorous, and legally binding tone. Do not include informal commentary.
                 """
 
                 response = client.models.generate_content(
@@ -169,31 +208,31 @@ if st.button("🚀 Generate Dual-Action Dossier (Grievance + RTI Form)", type="p
                     contents=prompt
                 )
 
-                dossier_text = response.text
-                st.success("✅ Dual Legal Dossier Generated Successfully!")
-                
-                st.text_area("Legal Memorandum & RTI Application Preview", dossier_text, height=400)
-                
-                # Generate PDF (in English encoding for standard printable format)
-                pdf_bytes = generate_pdf(school_name, udise_code, state, district, block, dossier_text)
-                
-                p_col1, p_col2 = st.columns(2)
-                with p_col1:
+                dossier_content = response.text
+                st.success("✅ Statutory Field Audit Dossier Generated!")
+
+                st.text_area("Complete Statutory Instrument Preview", dossier_content, height=400)
+
+                # Generate Official PDF Document
+                pdf_bytes = build_pdf_dossier(school_name, udise_code, state, district, block, dossier_content)
+
+                b_col1, b_col2 = st.columns(2)
+                with b_col1:
                     st.download_button(
-                        label="📄 Download Official Printable Dossier (PDF)",
+                        label="📄 Download Official Legal Action Pack (PDF)",
                         data=pdf_bytes,
                         file_name=f"OpenRTE_Dossier_{udise_code}.pdf",
                         mime="application/pdf",
                         use_container_width=True
                     )
-                with p_col2:
+                with b_col2:
                     st.download_button(
-                        label="📝 Download Raw Dossier (.txt)",
-                        data=dossier_text,
+                        label="📝 Download Text File (.txt)",
+                        data=dossier_content,
                         file_name=f"OpenRTE_Dossier_{udise_code}.txt",
                         mime="text/plain",
                         use_container_width=True
                     )
 
             except Exception as e:
-                st.error(f"Engine Error: {e}")
+                st.error(f"Generation Error: {e}")
