@@ -169,7 +169,7 @@ if st.button("Generate Complete Statutory Legal & RTI Dossier", type="primary"):
         st.warning("Please flag at least one infrastructure deficit to audit.")
     else:
         jurisdiction = JURISDICTION_REGISTRY[state]
-        with st.spinner("Compiling statutory citations, precedent rulings, and RTI clauses..."):
+        with st.spinner("Compiling statutory citations, precedent rulings, and RTI clauses via Flash engine..."):
             try:
                 client = genai.Client()
                 prompt = f"""
@@ -212,29 +212,14 @@ if st.button("Generate Complete Statutory Legal & RTI Dossier", type="primary"):
                 Maintain an objective, rigorous, and legally binding tone. Do not include informal commentary.
                 """
 
-                # Active endpoints with fallback
-                models_to_try = [
-                    'gemini-3.6-flash',
-                    'gemini-3.1-pro-preview'
-                ]
-                
-                response = None
-                last_error = None
-                
-                for model_id in models_to_try:
-                    try:
-                        response = client.models.generate_content(
-                            model=model_id,
-                            contents=prompt
-                        )
-                        if response and response.text:
-                            break
-                    except Exception as model_err:
-                        last_error = model_err
-                        continue
+                # Target gemini-3.6-flash directly for high token allowance and fast execution
+                response = client.models.generate_content(
+                    model='gemini-3.6-flash',
+                    contents=prompt
+                )
                 
                 if not response or not response.text:
-                    raise Exception(f"Model service error: {last_error}")
+                    raise Exception("The generation engine returned an empty response.")
 
                 dossier_content = response.text
                 st.success("✅ Statutory Field Audit Dossier Generated!")
