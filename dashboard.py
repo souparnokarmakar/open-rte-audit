@@ -84,8 +84,7 @@ def build_pdf_dossier(school_name, udise_code, state, district, block, generated
     pdf.cell(0, 5, f"ADMINISTRATIVE JURISDICTION: Block {block}, District {district}, {state}", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(3)
     
-    # Body Processing
-    pdf.set_font("Helvetica", size=9)
+    # Comprehensive character sanitization for PDF encoding
     clean_text = (
         generated_text.replace("**", "")
         .replace("###", "")
@@ -93,7 +92,18 @@ def build_pdf_dossier(school_name, udise_code, state, district, block, generated
         .replace("#", "")
         .replace("–", "-")
         .replace("—", "-")
+        .replace("’", "'")
+        .replace("‘", "'")
+        .replace("“", '"')
+        .replace("”", '"')
+        .replace("₹", "Rs. ")
+        .replace("•", "-")
+        .replace("…", "...")
     )
+    # Encode and decode to strip any remaining unsupported non-latin-1 characters
+    clean_text = clean_text.encode("latin-1", "replace").decode("latin-1")
+    
+    pdf.set_font("Helvetica", size=9)
     pdf.multi_cell(0, 5.2, clean_text)
     
     # Field Verification Block
