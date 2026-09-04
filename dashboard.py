@@ -100,7 +100,6 @@ def build_pdf_dossier(school_name, udise_code, state, district, block, generated
         .replace("•", "-")
         .replace("…", "...")
     )
-    # Encode and decode to strip any remaining unsupported non-latin-1 characters
     clean_text = clean_text.encode("latin-1", "replace").decode("latin-1")
     
     pdf.set_font("Helvetica", size=9)
@@ -170,7 +169,7 @@ if st.button("Generate Complete Statutory Legal & RTI Dossier", type="primary"):
         st.warning("Please flag at least one infrastructure deficit to audit.")
     else:
         jurisdiction = JURISDICTION_REGISTRY[state]
-        with st.spinner("Compiling statutory citations, precedent rulings, and RTI inquiry clauses..."):
+        with st.spinner("Compiling statutory citations, precedent rulings, and RTI clauses..."):
             try:
                 client = genai.Client()
                 prompt = f"""
@@ -213,10 +212,30 @@ if st.button("Generate Complete Statutory Legal & RTI Dossier", type="primary"):
                 Maintain an objective, rigorous, and legally binding tone. Do not include informal commentary.
                 """
 
-                response = client.models.generate_content(
-                    model='gemini-3.6-flash',
-                    contents=prompt
-                )
+                # Multi-model fallback chain to protect against temporary 503 traffic spikes
+                models_to_try = [
+                    'gemini-2.5-flash',
+                    'gemini-2.5-pro',
+                    'gemini-2.0-flash'
+                ]
+                
+                response = None
+                last_error = None
+                
+                for model_id in models_to_try:
+                    try:
+                        response = client.models.generate_content(
+                            model=model_id,
+                            contents=prompt
+                        )
+                        if response and response.text:
+                            break
+                    except Exception as model_err:
+                        last_error = model_err
+                        continue
+                
+                if not response or not response.text:
+                    raise Exception(f"Endpoints busy or unavailable: {last_error}")
 
                 dossier_content = response.text
                 st.success("✅ Statutory Field Audit Dossier Generated!")
