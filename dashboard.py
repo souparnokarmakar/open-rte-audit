@@ -105,8 +105,12 @@ def build_pdf_dossier(school_name, udise_code, state, district, block, generated
     pdf.set_font("Helvetica", size=9)
     pdf.multi_cell(0, 5.2, clean_text)
     
-    # Field Verification Block
-    pdf.ln(6)
+    # Field Verification Block - prevents page split
+    if pdf.get_y() > 220:
+        pdf.add_page()
+    else:
+        pdf.ln(4)
+        
     pdf.set_font("Helvetica", "B", 9)
     pdf.cell(0, 5, "ON-GROUND VERIFICATION & PHYSICAL CITIZEN ENDORSEMENT", new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("Helvetica", size=8)
@@ -169,7 +173,7 @@ if st.button("Generate Complete Statutory Legal & RTI Dossier", type="primary"):
         st.warning("Please flag at least one infrastructure deficit to audit.")
     else:
         jurisdiction = JURISDICTION_REGISTRY[state]
-        with st.spinner("Compiling statutory citations, precedent rulings, and RTI clauses via Flash engine..."):
+        with st.spinner("Compiling statutory citations, precedent rulings, and RTI clauses..."):
             try:
                 client = genai.Client()
                 prompt = f"""
@@ -212,7 +216,6 @@ if st.button("Generate Complete Statutory Legal & RTI Dossier", type="primary"):
                 Maintain an objective, rigorous, and legally binding tone. Do not include informal commentary.
                 """
 
-                # Target gemini-3.6-flash directly for high token allowance and fast execution
                 response = client.models.generate_content(
                     model='gemini-3.6-flash',
                     contents=prompt
